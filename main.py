@@ -61,15 +61,22 @@ def daylight_temp(file_path, target_date):
     for row in reader:
         dt = datetime.strptime(row["DATE"], "%m/%d/%y %H:%M") #get the date from each row in reader. %H and %m and %d handle edge cases
         if dt.date() == target_date:
-            if not sunrise and row["DAILYSunrise"].strip():
-                sunrise = int(row["DAILYSunrise"].strip())
-            if not sunset and row["DAILYSunset"].strip():
-                sunset = int(row["DAILYSunset"].strip())
+            if sunrise is None and row["DAILYSunrise"].strip():
+                try: #there's always empty cells
+                    sunrise = int(row["DAILYSunrise"].strip())
+                except ValueError:
+                    pass
+            if sunset is None and row["DAILYSunset"].strip():
+                try:
+                    sunset = int(row["DAILYSunset"].strip())
+                except ValueError:
+                    pass
             if sunrise<=(dt.hour*100 + dt.minute)<=sunset:
                 try:
                     temps.append(int(row["HOURLYDRYBULBTEMPF"].strip()))
                 except ValueError: #some of the rows are in weird formats
-                    raise TypeError("An entry was in the wrong format")
+                    print ("An entry was in the wrong format")
+                    continue
         
         elif dt.date() > target_date:
             #the date does not exist in this csv file
@@ -78,12 +85,19 @@ def daylight_temp(file_path, target_date):
 
     my_file.close()
 
+    #so there isnt any zero division
+    if not temps: 
+        print("No temperature data found for this date.")
+        return
     average = sum(temps) / len(temps)
+
+    if len(temps) < 2:
+        return f"{average}\n0"
 
     variance = sum((t - average) ** 2 for t in temps) / (len(temps) - 1)
     std_dev = math.sqrt(variance)
 
-    return(average + "\n" + std_dev)
+    return f"{average}\n{std_dev}"
 
 
 #looking for HOURLYWindSpeed
@@ -125,7 +139,6 @@ def windchills(file_path, target_date):
 #sky conditions and this will be a well-rounded metric to use as a sole metric since it is 
 #a numeric comparison
 def similar_day(file_path1, file_path2):
-    pass
     #dictionary mapping of date to condition
     atlanta = map_conditions(file_path1)
     canadian = map_conditions(file_path2)
